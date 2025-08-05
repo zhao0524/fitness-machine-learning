@@ -122,7 +122,7 @@ def read_data_from_files(files):
     
     return acc_df, gyr_df
 
-acc_df,  = read_data_from_files(files)
+acc_df, gyr_df = read_data_from_files(files)
 
 
 # --------------------------------------------------------------
@@ -132,6 +132,7 @@ data_merged = pd.concat([acc_df.iloc[:,:3], gyr_df], axis=1)
 
 data_merged.columns = ["acc_x", "acc_y", "acc_z", "gyr_x", "gyr_y", "gyr_z", "participant", "label", "category", "set"]
 
+
 # --------------------------------------------------------------
 # Resample data (frequency conversion)
 # --------------------------------------------------------------
@@ -139,7 +140,30 @@ data_merged.columns = ["acc_x", "acc_y", "acc_z", "gyr_x", "gyr_y", "gyr_z", "pa
 # Accelerometer:    12.500HZ
 # Gyroscope:        25.000Hz
 
-data_merged.iloc[:100].select_dtypes(include="number").resample(rule = "200ms").mean()
+sampling = {"acc_x" :"mean",
+            "acc_y" :"mean",
+            "acc_z" :"mean",
+            "gyr_x" :"mean",
+            "gyr_y" :"mean",
+            "gyr_z" :"mean",
+            "label":"last",
+            "category":"last",
+            "participant":"last",
+            "set":"last"}
+
+
+data_merged[:1000].resample(rule = "200ms").apply(sampling)
+
+# split by days
+days = [g for n, g in data_merged.groupby(pd.Grouper(freq="D"))]
+
+# loop over days, for everyday drop all the nan
+data_resampled = pd.concat([df.resample(rule = "200ms").apply(sampling).dropna() for df in days])
+
+data_resampled.info()
+
+data_resampled["set"] = data_resampled["set"].astype(int)
 # --------------------------------------------------------------
 # Export dataset
 # --------------------------------------------------------------
+
