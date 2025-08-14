@@ -34,6 +34,7 @@ Y = df_train["label"]
 
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.25, random_state=42, stratify=Y)
 
+print(X_train.columns)
 
 fig, ax = plt.subplots(figsize=(10, 5))
 df_train["label"].value_counts().plot(kind="bar", ax=ax, color = "lightblue", label = "Total")
@@ -48,7 +49,7 @@ plt.show()
 
 basic_features = ["acc_x", "acc_y", "acc_z", "gyr_x", "gyr_y", "gyr_z"]
 square_features = ["acc_r", "gyr_r"]
-pca_features = ["pca1", "pca2", "pca3"]
+pca_features = ["pca_1", "pca_2", "pca_3"]
 time_features = [f for f in df_train.columns if "_temp_" in f]
 freq_features = [f for f in df_train.columns if ("_freq" in f )or ("_pse" in f)]
 cluster_feature = ["cluster"]
@@ -65,8 +66,9 @@ feature_set_2 = list(set(basic_features + square_features + pca_features))
 feature_set_3 = list(set(feature_set_2 + time_features))
 feature_set_4 = list(set(feature_set_3 + freq_features + cluster_feature))
 
+
 # --------------------------------------------------------------
-# Create a grouped bar plot to compare the results
+# Grid search for best hyperparameters and model selection
 # --------------------------------------------------------------
 
 learner = ClassificationAlgorithms()
@@ -89,6 +91,18 @@ select_features = [
     'acc_x_freq_0.714_Hz_ws_14'
 ]
 
+ordered_scores = [0.8872802481902792,
+ 0.9758703895208549,
+ 0.9972423302309549,
+ 0.9993105825577387,
+ 0.9996552912788693,
+ 0.9996552912788693,
+ 0.9996552912788693,
+ 0.9996552912788693,
+ 0.9996552912788693,
+ 0.9996552912788693]
+
+
 plt.figure(figsize=(10, 5))
 plt.plot(np.arange(1, max_feature + 1, 1), ordered_scores)
 plt.xlabel("Number of Features")
@@ -96,6 +110,108 @@ plt.ylabel("Accuracy")
 plt.xticks(np.arange(1, max_feature + 1, 1))
 plt.grid()
 plt.show()
+
+possible_feature_sets = [feature_set_1, feature_set_2, feature_set_3, feature_set_4, select_features]
+
+feature_names = ["Feature Set 1", "Feature Set 2", "Feature Set 3", "Feature Set 4", "Selected Features"]
+
+iterations = 1
+score_df = pd.DataFrame()
+
+
+for i, f in zip(range(len(possible_feature_sets)), feature_names):
+    print("Feature set:", i)
+    selected_train_X = X_train[possible_feature_sets[i]]
+    selected_test_X = X_test[possible_feature_sets[i]]
+
+    # First run non deterministic classifiers to average their score.
+    performance_test_nn = 0
+    performance_test_rf = 0
+
+    for it in range(0, iterations):
+        print("\tTraining neural network,", it)
+        (
+            class_train_y,
+            class_test_y,
+            class_train_prob_y,
+            class_test_prob_y,
+        ) = learner.feedforward_neural_network(
+            selected_train_X,
+            Y_train,
+            selected_test_X,
+            gridsearch=False,
+        )
+        performance_test_nn += accuracy_score(Y_test, class_test_y)
+
+        print("\tTraining random forest,", it)
+        (
+            class_train_y,
+            class_test_y,
+            class_train_prob_y,
+            class_test_prob_y,
+        ) = learner.random_forest(
+            selected_train_X, Y_train, selected_test_X, gridsearch=True
+        )
+        performance_test_rf += accuracy_score(Y_test, class_test_y)
+
+    performance_test_nn = performance_test_nn / iterations
+    performance_test_rf = performance_test_rf / iterations
+
+    # And we run our deterministic classifiers:
+    print("\tTraining KNN")
+    (
+        class_train_y,
+        class_test_y,
+        class_train_prob_y,
+        class_test_prob_y,
+    ) = learner.k_nearest_neighbor(
+        selected_train_X, Y_train, selected_test_X, gridsearch=True
+    )
+    performance_test_knn = accuracy_score(Y_test, class_test_y)
+
+    print("\tTraining decision tree")
+    (
+        class_train_y,
+        class_test_y,
+        class_train_prob_y,
+        class_test_prob_y,
+    ) = learner.decision_tree(
+        selected_train_X, Y_train, selected_test_X, gridsearch=True
+    )
+    performance_test_dt = accuracy_score(Y_test, class_test_y)
+
+    print("\tTraining naive bayes")
+    (
+        class_train_y,
+        class_test_y,
+        class_train_prob_y,
+        class_test_prob_y,
+    ) = learner.naive_bayes(selected_train_X, Y_train, selected_test_X)
+
+    performance_test_nb = accuracy_score(Y_test, class_test_y)
+
+    # Save results to dataframe
+    models = ["NN", "RF", "KNN", "DT", "NB"]
+    new_scores = pd.DataFrame(
+        {
+            "model": models,
+            "feature_set": f,
+            "accuracy": [
+                performance_test_nn,
+                performance_test_rf,
+                performance_test_knn,
+                performance_test_dt,
+                performance_test_nb,
+            ],
+        }
+    )
+    score_df = pd.concat([score_df, new_scores])
+# --------------------------------------------------------------
+# Create a grouped bar plot to compare the results
+# --------------------------------------------------------------
+score_df.sort_values(by="accuracy", ascending=False)
+
+
 # --------------------------------------------------------------
 # Select best model and evaluate results
 # --------------------------------------------------------------
