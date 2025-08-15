@@ -91,13 +91,41 @@ def count_reps(dataset, cutoff= 0.4, order=10, column = "acc_r"):
     peaks = data.iloc[indexes]
     return len(peaks)
 
-count_reps(squat_set)
+count_reps(bench_set, cutoff=0.4)
+count_reps(squat_set, cutoff=0.35)
+count_reps(row_set, cutoff=0.6, column = "gyr_x")
+count_reps(ohp_set, cutoff=0.35)
+count_reps(dead_set, cutoff=0.4)
+
 
 # --------------------------------------------------------------
 # Create benchmark dataframe
 # --------------------------------------------------------------
+df["reps"] = df["category"].apply(lambda x: 5 if x =="heavy" else 10)
+rep_df = df.groupby(["label", "category", "set"])["reps"].max().reset_index()
 
+rep_df["reps_pred"] = 0
+
+for s in df["set"].unique():
+    subset = df[df["set"] == s]
+    column = "acc_r"
+    cutoff = 0.4
+    
+    if subset["label"].iloc[0] == "squat":
+        cutoff = 0.35
+    if subset["label"].iloc[0] == "row":
+        cutoff = 0.6
+        column = "gyr_x"
+    if subset["label"].iloc[0] == "ohp":
+        cutoff = 0.35
+    
+    reps = count_reps(subset, cutoff=cutoff, column=column)
+    rep_df.loc[rep_df["set"] == s, "reps_pred"] = reps
 
 # --------------------------------------------------------------
 # Evaluate the results
 # --------------------------------------------------------------
+
+error = mean_absolute_error(rep_df["reps"], rep_df["reps_pred"])
+
+rep_df.groupby(["label", "category"])["reps", "reps_pred"].mean().plot().bar()
