@@ -83,6 +83,8 @@ LowPass.low_pass_filter(bench_set, col=column, sampling_frequency=fs, cutoff_fre
 # --------------------------------------------------------------
 
 
+argrelextrema(bench_set["acc_r"].values, np.greater)
+
 # --------------------------------------------------------------
 # Create benchmark dataframe
 # --------------------------------------------------------------
