@@ -5,6 +5,8 @@ from DataTransformation import LowPassFilter
 from scipy.signal import argrelextrema
 from sklearn.metrics import mean_absolute_error
 
+from src import data
+
 pd.options.mode.chained_assignment = None
 
 
@@ -82,8 +84,14 @@ LowPass.low_pass_filter(bench_set, col=column, sampling_frequency=fs, cutoff_fre
 # Create function to count repetitions
 # --------------------------------------------------------------
 
+def count_reps(dataset, cutoff= 0.4, order=10, column = "acc_r"):
+    data = LowPass.low_pass_filter(dataset, col=column, sampling_frequency=fs, cutoff_frequency=cutoff, order=order)
 
-argrelextrema(bench_set["acc_r"].values, np.greater)
+    indexes = argrelextrema(data[column+"_lowpass"].values, np.greater)
+    peaks = data.iloc[indexes]
+    return len(peaks)
+
+count_reps(squat_set)
 
 # --------------------------------------------------------------
 # Create benchmark dataframe
